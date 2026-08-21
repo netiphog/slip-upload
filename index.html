@@ -2,38 +2,263 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>แจ้งอัพโหลดสลิป</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    body { font-family: sans-serif; padding: 16px; max-width: 480px; margin: 0 auto; }
-    label { font-size: 14px; font-weight: bold; display: block; margin-top: 12px; }
-    input[type="text"], input[type="file"] {
-      width: 100%; padding: 10px; margin-top: 6px; font-size: 16px;
-      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    :root {
+      /* Modern Professional Mobile UI — Clean, Minimal, Enterprise App Style */
+      --primary: #146C43;
+      --primary-dark: #0F5132;
+      --primary-soft: #E7F5EC;
+      --bg: #F6F7F9;
+      --card-bg: #ffffff;
+      --text: #1C1F26;
+      --muted: #8A8F98;
+      --border: #E7E9ED;
+      --radius: 20px;
+      --radius-sm: 14px;
     }
-    button {
-      width: 100%; padding: 12px; margin-top: 20px; font-size: 16px;
-      background: #06C755; color: white; border: none; border-radius: 6px;
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", sans-serif;
+      background: var(--bg);
+      margin: 0;
+      padding: 0;
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
     }
-    button:disabled { background: #999; }
-    #preview { max-width: 100%; margin-top: 10px; border-radius: 6px; display: none; }
-    #status { margin-top: 12px; font-size: 14px; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      color: var(--text);
+      padding: calc(20px + env(safe-area-inset-top)) 20px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+
+    #infoBtn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--border);
+      border: none;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-style: italic;
+      font-family: Georgia, serif;
+      transition: background 0.15s, transform 0.05s;
+    }
+    #infoBtn:active { background: #dcdfe4; transform: scale(0.94); }
+
+    main {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 12px 20px 20px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13.5px;
+      margin: 0 0 18px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 22px 18px;
+      box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 8px 20px rgba(20, 20, 30, 0.04);
+      border: 1px solid var(--border);
+    }
+
+    label {
+      font-size: 13.5px;
+      font-weight: 600;
+      display: block;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    label:first-child { margin-top: 0; }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 15px;
+      font-size: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: white;
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    input[type="text"]::placeholder {
+      font-size: 13.5px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .upload-box {
+      margin-top: 8px;
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 26px 16px;
+      text-align: center;
+      background: var(--bg);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .upload-box.has-image { border-style: solid; padding: 12px; background: var(--bg); }
+    .upload-box input[type="file"] { display: none; }
+    .upload-hint { color: var(--muted); font-size: 13.5px; font-weight: 500; }
+    .upload-hint svg { display: block; margin: 0 auto 10px; }
+
+    #preview {
+      max-width: 100%;
+      max-height: 260px;
+      border-radius: var(--radius-sm);
+      display: none;
+      margin: 0 auto;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 16px;
+      margin-top: 26px;
+      font-size: 16px;
+      font-weight: 600;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(20, 20, 30, 0.12);
+      transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
+    }
+    button[type="submit"]:active { transform: scale(0.98); background: var(--primary-dark); box-shadow: 0 2px 6px rgba(20, 20, 30, 0.1); }
+    button[type="submit"]:disabled { background: #D8D8E0; box-shadow: none; }
+
+    .footnote {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 18px;
+      line-height: 1.6;
+    }
+
+    /* Alerts แบบ native app: กล่องเล็กกลางจอ ปุ่มเต็มความกว้างคั่นด้วยเส้นบางๆ */
+    .swal2-popup { font-family: inherit !important; box-shadow: 0 10px 40px rgba(20,20,30,0.18) !important; }
+    .swal2-toast { border-radius: var(--radius-sm) !important; box-shadow: 0 6px 20px rgba(20,20,30,0.12) !important; }
+
+    .native-alert {
+      width: 280px !important;
+      border-radius: 18px !important;
+      padding: 22px 0 0 !important;
+    }
+    .native-alert-title {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      padding: 0 22px !important;
+      margin-bottom: 6px !important;
+      color: var(--text) !important;
+    }
+    .native-alert-text {
+      font-size: 13.5px !important;
+      color: var(--muted) !important;
+      padding: 0 22px 20px !important;
+      margin: 0 !important;
+      line-height: 1.6 !important;
+    }
+    .native-alert-actions {
+      margin: 0 !important;
+      width: 100% !important;
+      display: flex !important;
+      border-top: 1px solid var(--border) !important;
+    }
+    .native-btn {
+      flex: 1;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      font-weight: 600 !important;
+      font-size: 15.5px !important;
+      padding: 14px 0 !important;
+      box-shadow: none !important;
+    }
+    .native-btn-cancel {
+      color: var(--text) !important;
+      border-right: 1px solid var(--border) !important;
+      border-bottom-left-radius: 18px !important;
+    }
+    .native-btn-confirm {
+      color: var(--primary) !important;
+      font-weight: 700 !important;
+      border-bottom-right-radius: 18px !important;
+    }
+    .native-btn-single {
+      border-bottom-left-radius: 18px !important;
+      border-bottom-right-radius: 18px !important;
+    }
+    .native-loading { padding-bottom: 22px !important; }
+    .swal2-loader { border-color: var(--primary) transparent var(--primary) transparent !important; }
   </style>
 </head>
 <body>
-  <h3>แจ้งอัพโหลดสลิป</h3>
-  <form id="slipForm">
-    <label>สลิปนี้โอนแทนชื่อ (ถ้าไม่ใช่ตัวเอง ให้พิมพ์ชื่อคนนั้นได้)</label>
-    <input type="text" id="name" placeholder="เช่น สมชาย ใจดี" required>
+  <header>
+    <h1>แจ้งอัพโหลดสลิป</h1>
+    <button id="infoBtn" aria-label="เกี่ยวกับหน้านี้">i</button>
+  </header>
 
-    <label>แนบรูปสลิป</label>
-    <input type="file" id="slipImage" accept="image/*" capture="environment" required>
-    <img id="preview">
+  <main>
+    <p class="subtitle">แนบรูปสลิปโอนเงิน ระบบจะบันทึกและอ่านข้อมูลให้อัตโนมัติ</p>
+    <div class="card">
+      <form id="slipForm">
+        <label for="name">ชื่อผู้แจ้ง หรือโอนแทนใคร</label>
+        <input type="text" id="name" placeholder="ชื่อ-นามสกุลผู้โอน หรือคนที่โอนแทน" required>
 
-    <button type="submit" id="submitBtn">ส่งสลิป</button>
-  </form>
-  <p id="status"></p>
+        <label for="slipImage">แนบรูปสลิป</label>
+        <div class="upload-box" id="uploadBox">
+          <label for="slipImage" style="margin:0; cursor:pointer;">
+            <div class="upload-hint" id="uploadHint">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" stroke-width="1.6"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+              แตะเพื่อเลือกหรือถ่ายรูปสลิป
+            </div>
+            <img id="preview" alt="ตัวอย่างรูปสลิป">
+          </label>
+          <input type="file" id="slipImage" accept="image/*" capture="environment" required>
+        </div>
+
+        <button type="submit" id="submitBtn">ส่งสลิป</button>
+      </form>
+      <p class="footnote">ระบบจะบันทึกรูปและอ่านข้อมูลในสลิปให้อัตโนมัติ<br>กรุณาตรวจสอบความชัดเจนของรูปก่อนส่ง</p>
+    </div>
+  </main>
 
   <script>
     // ===== ตั้งค่าตรงนี้ =====
@@ -45,27 +270,118 @@
       console.error('LIFF init error', err);
     });
 
+    // ----- ปุ่ม Info: อธิบายสั้นๆ ว่าต้องกรอกชื่ออะไร -----
+    document.getElementById('infoBtn').addEventListener('click', function () {
+      Swal.fire({
+        title: 'วิธีใช้งาน',
+        html: `
+          กรอก<b>ชื่อ-นามสกุลจริง</b>ของผู้โอน (หรือชื่อคนที่คุณโอนแทน) ให้ตรงกับในสลิป แล้วแนบรูปสลิปให้ครบ<br><br>
+          หากส่งไม่สำเร็จหรือมีปัญหาการใช้งาน กรุณาติดต่อเจ้าหน้าที่
+        `,
+        showConfirmButton: true,
+        confirmButtonText: 'เข้าใจแล้ว',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'native-alert',
+          title: 'native-alert-title',
+          htmlContainer: 'native-alert-text',
+          actions: 'native-alert-actions',
+          confirmButton: 'native-btn native-btn-single'
+        }
+      });
+    });
+
     const fileInput = document.getElementById('slipImage');
     const preview = document.getElementById('preview');
+    const uploadHint = document.getElementById('uploadHint');
+    const uploadBox = document.getElementById('uploadBox');
+
     fileInput.addEventListener('change', function () {
       const file = fileInput.files[0];
       if (file) {
         preview.src = URL.createObjectURL(file);
         preview.style.display = 'block';
+        uploadHint.style.display = 'none';
+        uploadBox.classList.add('has-image');
       }
     });
 
     document.getElementById('slipForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       const submitBtn = document.getElementById('submitBtn');
-      const statusEl = document.getElementById('status');
       const name = document.getElementById('name').value.trim();
       const file = fileInput.files[0];
 
-      if (!name || !file) return;
+      if (!name) {
+        Swal.fire({
+          title: 'กรอกชื่อก่อนนะ',
+          text: 'กรุณาระบุชื่อผู้โอน หรือชื่อคนที่คุณโอนแทน',
+          showConfirmButton: true,
+          confirmButtonText: 'ตกลง',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'native-alert',
+            title: 'native-alert-title',
+            htmlContainer: 'native-alert-text',
+            actions: 'native-alert-actions',
+            confirmButton: 'native-btn native-btn-single'
+          }
+        });
+        return;
+      }
+      if (!file) {
+        Swal.fire({
+          title: 'ยังไม่ได้แนบรูป',
+          text: 'กรุณาแนบรูปสลิปก่อนส่ง',
+          showConfirmButton: true,
+          confirmButtonText: 'ตกลง',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'native-alert',
+            title: 'native-alert-title',
+            htmlContainer: 'native-alert-text',
+            actions: 'native-alert-actions',
+            confirmButton: 'native-btn native-btn-single'
+          }
+        });
+        return;
+      }
+
+      // ----- Confirm ก่อนส่งจริง -----
+      const confirmResult = await Swal.fire({
+        title: 'ยืนยันการส่งสลิป?',
+        html: `
+          <b>โอนแทน:</b> ${escapeHtml(name)}<br><br>
+          <img src="${preview.src}" style="max-width:100%; max-height:200px; border-radius:12px; display:block; margin:0 auto;">
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ส่งสลิป',
+        cancelButtonText: 'ยกเลิก',
+        reverseButtons: true,
+        buttonsStyling: false,
+        customClass: {
+          popup: 'native-alert',
+          title: 'native-alert-title',
+          htmlContainer: 'native-alert-text',
+          actions: 'native-alert-actions',
+          cancelButton: 'native-btn native-btn-cancel',
+          confirmButton: 'native-btn native-btn-confirm'
+        }
+      });
+      if (!confirmResult.isConfirmed) return;
 
       submitBtn.disabled = true;
-      statusEl.innerText = 'กำลังส่งสลิป...';
+
+      // ----- Loading -----
+      Swal.fire({
+        title: 'กำลังส่งสลิป...',
+        text: 'กรุณารอสักครู่',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        customClass: { popup: 'native-alert native-loading', title: 'native-alert-title', htmlContainer: 'native-alert-text' },
+        didOpen: () => { Swal.showLoading(); }
+      });
 
       try {
         const base64 = await toBase64(file);
@@ -83,16 +399,55 @@
         const result = await res.json();
 
         if (result.status === 'success') {
-          statusEl.innerText = 'ส่งสลิปสำเร็จ ขอบคุณครับ';
-          setTimeout(function () {
-            if (liff.isInClient()) liff.closeWindow();
-          }, 1500);
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top',
+            showConfirmButton: false,
+            timer: 1800,
+            timerProgressBar: true
+          });
+          await Toast.fire({ icon: 'success', title: 'ส่งสลิปสำเร็จ' });
+          if (liff.isInClient && liff.isInClient()) {
+            liff.closeWindow();
+          } else {
+            document.getElementById('slipForm').reset();
+            preview.style.display = 'none';
+            uploadHint.style.display = 'block';
+            uploadBox.classList.remove('has-image');
+            submitBtn.disabled = false;
+          }
         } else {
-          statusEl.innerText = 'เกิดข้อผิดพลาด: ' + result.message;
+          Swal.fire({
+            title: 'ส่งสลิปไม่สำเร็จ',
+            text: (result.message || 'ไม่ทราบสาเหตุ') + ' หากเกิดปัญหานี้ซ้ำ กรุณาติดต่อเจ้าหน้าที่',
+            showConfirmButton: true,
+            confirmButtonText: 'ตกลง',
+            buttonsStyling: false,
+            customClass: {
+              popup: 'native-alert',
+              title: 'native-alert-title',
+              htmlContainer: 'native-alert-text',
+              actions: 'native-alert-actions',
+              confirmButton: 'native-btn native-btn-single'
+            }
+          });
           submitBtn.disabled = false;
         }
       } catch (err) {
-        statusEl.innerText = 'ส่งไม่สำเร็จ: ' + err.message;
+        Swal.fire({
+          title: 'ส่งไม่สำเร็จ',
+          text: 'กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่ หากยังไม่ได้ กรุณาติดต่อเจ้าหน้าที่',
+          showConfirmButton: true,
+          confirmButtonText: 'ตกลง',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'native-alert',
+            title: 'native-alert-title',
+            htmlContainer: 'native-alert-text',
+            actions: 'native-alert-actions',
+            confirmButton: 'native-btn native-btn-single'
+          }
+        });
         submitBtn.disabled = false;
       }
     });
@@ -104,6 +459,12 @@
         reader.onload = function () { resolve(reader.result.split(',')[1]); };
         reader.onerror = reject;
       });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.innerText = str;
+      return div.innerHTML;
     }
   </script>
 </body>

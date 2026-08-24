@@ -37,39 +37,72 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      background: var(--bg);
+      background: var(--card-bg);
       color: var(--text);
-      padding: calc(20px + env(safe-area-inset-top)) 20px 8px;
+      padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(20, 20, 30, 0.04);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .header-brand-icon {
+      flex: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: var(--primary-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     header h1 {
-      font-size: 18px;
+      font-size: 16.5px;
       margin: 0;
       font-weight: 700;
       letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    #infoBtn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--border);
-      border: none;
+    .header-subtitle {
+      font-size: 11.5px;
       color: var(--muted);
+      font-weight: 500;
+      margin-top: 1px;
+    }
+
+    /* ปุ่ม info: โทนส้ม-เทา ให้เด่นชัดแยกจากปุ่มหลัก (เขียว) ของหน้า */
+    #infoBtn {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #EFEFF2;
+      border: 1.5px solid #E3DED7;
+      color: #C97A2B;
       font-size: 14px;
-      font-weight: 700;
+      font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       font-style: italic;
       font-family: Georgia, serif;
-      transition: background 0.15s, transform 0.05s;
+      transition: background 0.15s, transform 0.05s, border-color 0.15s;
     }
-    #infoBtn:active { background: #dcdfe4; transform: scale(0.94); }
+    #infoBtn:active { background: #E3E4E8; border-color: #C97A2B; transform: scale(0.94); }
 
     main {
       max-width: 480px;
@@ -321,7 +354,15 @@
 </head>
 <body>
   <header>
-    <h1>แจ้งอัพโหลดสลิป</h1>
+    <div class="header-brand">
+      <div class="header-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>แจ้งอัพโหลดสลิป</h1>
+        <div class="header-subtitle">ระบบแจ้งโอนเงินร้านค้า</div>
+      </div>
+    </div>
     <button id="infoBtn" aria-label="เกี่ยวกับหน้านี้">i</button>
   </header>
 
@@ -352,7 +393,7 @@
 
   <script>
     // ===== ตั้งค่าตรงนี้ =====
-    const LIFF_ID = '2011191557-QSmaj2No';
+    const LIFF_ID = '2011227416-WcRPwj9L';
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXE2SdXyZo3-_3ibrfa8X3s3n1A1colXlXEyzN7JLNh9iCgsda12K7UrMUESZxOYb7sQ/exec';
     // =========================
 

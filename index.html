@@ -356,7 +356,17 @@
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXE2SdXyZo3-_3ibrfa8X3s3n1A1colXlXEyzN7JLNh9iCgsda12K7UrMUESZxOYb7sQ/exec';
     // =========================
 
-    liff.init({ liffId: LIFF_ID }).catch(function (err) {
+    let liffProfile = null; // เก็บโปรไฟล์ LINE ของผู้ใช้ (ใช้ userId ส่งไปให้ Apps Script push ข้อความกลับ)
+
+    liff.init({ liffId: LIFF_ID }).then(async function () {
+      try {
+        if (liff.isLoggedIn()) {
+          liffProfile = await liff.getProfile();
+        }
+      } catch (profileErr) {
+        console.error('getProfile error', profileErr);
+      }
+    }).catch(function (err) {
       console.error('LIFF init error', err);
     });
 
@@ -545,7 +555,8 @@
           body: JSON.stringify({
             name: name,
             image: base64,
-            mimeType: file.type
+            mimeType: file.type,
+            userId: liffProfile ? liffProfile.userId : null
           })
         });
 

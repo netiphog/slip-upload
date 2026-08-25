@@ -83,6 +83,41 @@
       margin-top: 1px;
     }
 
+    /* โปรไฟล์ผู้ใช้ LINE บน header: รูป + ชื่อ แสดงเมื่อ liff.getProfile() สำเร็จ */
+    .header-actions {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #userProfile {
+      display: none; /* โชว์ด้วย JS หลัง getProfile สำเร็จ */
+      align-items: center;
+      gap: 7px;
+      padding: 4px 10px 4px 4px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      max-width: 140px;
+    }
+    #userProfile img {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      flex: none;
+      object-fit: cover;
+      background: var(--border);
+    }
+    #userProfile span {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* ปุ่ม info: โทนส้ม-เทา ให้เด่นชัดแยกจากปุ่มหลัก (เขียว) ของหน้า */
     #infoBtn {
       flex: none;
@@ -363,7 +398,13 @@
         <div class="header-subtitle">ระบบแจ้งโอนเงินร้านค้า</div>
       </div>
     </div>
-    <button id="infoBtn" aria-label="เกี่ยวกับหน้านี้">i</button>
+    <div class="header-actions">
+      <div id="userProfile">
+        <img id="userProfileImg" src="" alt="">
+        <span id="userProfileName"></span>
+      </div>
+      <button id="infoBtn" aria-label="เกี่ยวกับหน้านี้">i</button>
+    </div>
   </header>
 
   <main>
@@ -403,6 +444,7 @@
       try {
         if (liff.isLoggedIn()) {
           liffProfile = await liff.getProfile();
+          showUserProfile(liffProfile);
         }
       } catch (profileErr) {
         console.error('getProfile error', profileErr);
@@ -410,6 +452,22 @@
     }).catch(function (err) {
       console.error('LIFF init error', err);
     });
+
+    // แสดงรูป + ชื่อโปรไฟล์ LINE บน header (badge ข้างปุ่ม info)
+    function showUserProfile(profile) {
+      if (!profile) return;
+      const wrap = document.getElementById('userProfile');
+      const img = document.getElementById('userProfileImg');
+      const nameEl = document.getElementById('userProfileName');
+      if (profile.pictureUrl) {
+        img.src = profile.pictureUrl;
+        img.style.display = 'block';
+      } else {
+        img.style.display = 'none';
+      }
+      nameEl.textContent = profile.displayName || '';
+      wrap.style.display = 'flex';
+    }
 
     // ================== Alert visuals: วงกลมไอคอน + จุดตกแต่ง ==================
     const ALERT_PALETTE = {

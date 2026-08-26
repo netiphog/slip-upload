@@ -6,7 +6,6 @@
   <title>แจ้งอัพโหลดสลิป</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
     :root {
       /* Modern Professional Mobile UI — Clean, Minimal, Enterprise App Style */
@@ -536,31 +535,6 @@
       try { liff.login(); } catch (e) { location.reload(); }
     });
 
-    // [ใหม่] ถอดรหัสเนื้อหาใน JWT (idToken) แบบไม่ verify ลายเซ็น เอาไว้เช็ค "exp"
-    // (วันหมดอายุ) ฝั่งหน้าเว็บเองเท่านั้น เพื่อรู้ทันทีว่า session เก่าหมดอายุหรือยัง
-    // การ verify ลายเซ็นจริงยังทำที่ backend เหมือนเดิม อันนี้ใช้เพื่อ UX เท่านั้น
-    function decodeJwtPayload(token) {
-      try {
-        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const json = decodeURIComponent(atob(base64).split('').map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(json);
-      } catch (e) {
-        return null;
-      }
-    }
-
-    // [ใหม่] เมื่อพบว่า session/token หมดอายุ ให้เคลียร์สถานะ login เก่าทิ้งแล้ว
-    // สั่ง login ใหม่ให้อัตโนมัติทันที ผู้ใช้ไม่ต้องไปเคลียร์แคชเบราว์เซอร์เอง
-    function forceReloginDueToExpiry() {
-      setAuthGate({ loading: true, title: 'เซสชันหมดอายุ กำลังเข้าสู่ระบบใหม่...', text: 'กรุณารอสักครู่' });
-      try {
-        if (liff.isLoggedIn()) liff.logout(); // เคลียร์ session เก่าที่หมดอายุทิ้งก่อน
-      } catch (e) { /* ไม่เป็นไรถ้า logout ไม่สำเร็จ ยังไงก็จะ login ใหม่ต่อ */ }
-      liff.login(); // จะ redirect ไปหน้า LINE login ใหม่ทั้งหมด แล้วเด้งกลับมาพร้อม token ใหม่
-    }
-
     async function initAuth() {
       setAuthGate({ loading: true, title: 'กำลังตรวจสอบสิทธิ์...', text: 'กรุณารอสักครู่' });
       try {
@@ -583,16 +557,6 @@
             showRetry: true,
             danger: true
           });
-          return;
-        }
-
-        // [ใหม่] เช็ควันหมดอายุของ token เอง (exp เป็นหน่วยวินาทีแบบ Unix timestamp)
-        // ถ้าหมดอายุแล้ว (หรือใกล้จะหมดในอีกไม่กี่วินาที) ให้ auto login ใหม่ทันที
-        // ไม่ต้องรอให้ backend verify ไม่ผ่านแล้วค่อยเจอทางตัน
-        const payload = decodeJwtPayload(liffIdToken);
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (!payload || !payload.exp || payload.exp <= nowSec + 10) {
-          forceReloginDueToExpiry();
           return;
         }
 
@@ -741,41 +705,13 @@
     const uploadHint = document.getElementById('uploadHint');
     const uploadBox = document.getElementById('uploadBox');
 
-    let qrPayload = null; // [ใหม่] ข้อความดิบที่อ่านได้จาก QR ในรูปสลิป (ถ้าเจอ) — ส่งไปให้ backend ช่วยแยกข้อมูลให้แม่นขึ้น
-
-    // [ใหม่] อ่าน QR code จากรูปสลิปฝั่งเบราว์เซอร์ด้วย jsQR (ทำงานในเครื่อง ไม่เรียก API ใดๆ)
-    function decodeQrFromFile(file) {
-      return new Promise(function (resolve) {
-        const img = new Image();
-        img.onload = function () {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const result = jsQR(imageData.data, imageData.width, imageData.height);
-            resolve(result ? result.data : null);
-          } catch (e) {
-            console.error('QR decode error', e);
-            resolve(null);
-          }
-        };
-        img.onerror = function () { resolve(null); };
-        img.src = URL.createObjectURL(file);
-      });
-    }
-
-    fileInput.addEventListener('change', async function () {
+    fileInput.addEventListener('change', function () {
       const file = fileInput.files[0];
       if (file) {
         preview.src = URL.createObjectURL(file);
         preview.style.display = 'block';
         uploadHint.style.display = 'none';
         uploadBox.classList.add('has-image');
-
-        qrPayload = await decodeQrFromFile(file); // เก็บผล QR (หรือ null ถ้าไม่เจอ) ไว้ส่งตอน submit
       }
     });
 
@@ -858,8 +794,7 @@
             name: name,
             image: base64,
             mimeType: file.type,
-            idToken: liffIdToken, // backend จะ verify กับ LINE server เอง ไม่เชื่อ userId ที่ส่งตรงๆ อีกต่อไป
-            qrPayload: qrPayload  // [ใหม่] ข้อความดิบจาก QR ในสลิป (หรือ null ถ้าไม่เจอ QR) — backend เอาไปช่วยแยกข้อมูลให้แม่นขึ้น
+            idToken: liffIdToken // backend จะ verify กับ LINE server เอง ไม่เชื่อ userId ที่ส่งตรงๆ อีกต่อไป
           })
         });
 
@@ -883,16 +818,6 @@
               submitBtn.disabled = false;
             }
           }
-        } else if (result.authError) {
-          // [ใหม่] เซสชันหมดอายุ/verify ไม่ผ่านฝั่ง backend -> พา user ไป login ใหม่
-          // ให้อัตโนมัติเลย ไม่ต้องให้ user งงว่าต้องทำอะไรต่อหรือไปเคลียร์แคชเอง
-          await fireAlert({
-            type: 'warning',
-            title: 'เซสชันหมดอายุ',
-            text: 'ระบบจะพาท่านไปเข้าสู่ระบบ LINE ใหม่อีกครั้ง',
-            confirmText: 'เข้าสู่ระบบใหม่'
-          });
-          forceReloginDueToExpiry();
         } else {
           fireAlert({
             type: 'error',

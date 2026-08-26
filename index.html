@@ -333,6 +333,63 @@
     .native-loading { padding-bottom: 26px !important; }
     .swal2-loader { border-color: var(--primary) transparent var(--primary) transparent !important; }
 
+    /* ----- Auth gate: บังหน้าจอไว้จนกว่าจะยืนยันตัวตนผ่าน LINE สำเร็จ ----- */
+    #authGate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      text-align: center;
+    }
+    #authGate .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      animation: authspin 0.8s linear infinite;
+      margin-bottom: 18px;
+    }
+    @keyframes authspin { to { transform: rotate(360deg); } }
+    #authGate .authIconCircle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #FDECEC;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+    #authGate h2 {
+      font-size: 16.5px;
+      margin: 0 0 8px;
+      color: var(--text);
+    }
+    #authGate p {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 0 0 22px;
+      line-height: 1.6;
+      max-width: 300px;
+    }
+    #authGate button {
+      padding: 13px 26px;
+      font-size: 14.5px;
+      font-weight: 600;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    main.blurred, header.blurred { filter: blur(3px); pointer-events: none; user-select: none; }
+
     /* ----- เนื้อหาใน infoBtn: ขั้นตอนแบบมีไอคอน (ตามภาพตัวอย่าง) ----- */
     .howto-steps {
       display: flex;
@@ -388,7 +445,15 @@
   </style>
 </head>
 <body>
-  <header>
+  <div id="authGate">
+    <div class="spinner" id="authGateSpinner"></div>
+    <div id="authGateIcon" style="display:none;"></div>
+    <h2 id="authGateTitle">กำลังตรวจสอบสิทธิ์...</h2>
+    <p id="authGateText">กรุณารอสักครู่</p>
+    <button id="authGateRetryBtn" style="display:none;">เข้าสู่ระบบด้วย LINE</button>
+  </div>
+
+  <header class="blurred">
     <div class="header-brand">
       <div class="header-brand-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg>
@@ -407,7 +472,7 @@
     </div>
   </header>
 
-  <main>
+  <main class="blurred">
     <p class="subtitle">แนบรูปสลิปโอนเงิน ระบบจะบันทึกและอ่านข้อมูลให้อัตโนมัติ</p>
     <div class="card">
       <form id="slipForm">
@@ -438,20 +503,83 @@
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXE2SdXyZo3-_3ibrfa8X3s3n1A1colXlXEyzN7JLNh9iCgsda12K7UrMUESZxOYb7sQ/exec';
     // =========================
 
-    let liffProfile = null; // เก็บโปรไฟล์ LINE ของผู้ใช้ (ใช้ userId ส่งไปให้ Apps Script push ข้อความกลับ)
+    let liffProfile = null;  // โปรไฟล์ LINE (ใช้แสดงผลบน header เท่านั้น ไม่ใช่ตัวที่ backend เชื่อ)
+    let liffIdToken = null;  // [ใหม่] ID Token — ตัวนี้แหละที่ backend จะเอาไป verify กับ LINE server
+    let authReady = false;   // true เมื่อ login + ได้ idToken เรียบร้อย ถึงจะกดส่งสลิปได้
 
-    liff.init({ liffId: LIFF_ID }).then(async function () {
+    // ----- Auth gate: บังหน้าจอไว้จนกว่าจะยืนยันตัวตนผ่าน LINE สำเร็จ -----
+    const authGate = document.getElementById('authGate');
+    function setAuthGate({ loading = false, title, text, showRetry = false, danger = false }) {
+      document.getElementById('authGateSpinner').style.display = loading ? 'block' : 'none';
+      const iconEl = document.getElementById('authGateIcon');
+      if (!loading) {
+        iconEl.style.display = 'flex';
+        iconEl.className = 'authIconCircle';
+        iconEl.innerHTML = danger
+          ? '<svg width="30" height="30" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke="#E5484D" stroke-width="2.6" stroke-linecap="round"/></svg>'
+          : '';
+      } else {
+        iconEl.style.display = 'none';
+      }
+      document.getElementById('authGateTitle').textContent = title || '';
+      document.getElementById('authGateText').textContent = text || '';
+      const retryBtn = document.getElementById('authGateRetryBtn');
+      retryBtn.style.display = showRetry ? 'inline-block' : 'none';
+    }
+    function hideAuthGate() {
+      authGate.style.display = 'none';
+      document.querySelector('header').classList.remove('blurred');
+      document.querySelector('main').classList.remove('blurred');
+    }
+    document.getElementById('authGateRetryBtn').addEventListener('click', function () {
+      try { liff.login(); } catch (e) { location.reload(); }
+    });
+
+    async function initAuth() {
+      setAuthGate({ loading: true, title: 'กำลังตรวจสอบสิทธิ์...', text: 'กรุณารอสักครู่' });
       try {
-        if (liff.isLoggedIn()) {
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          // ยังไม่ได้ login ผ่านไลน์ -> สั่ง login ทันที (จะ redirect ออกไปหน้า LINE
+          // แล้วเด้งกลับมาที่หน้านี้พร้อมสถานะ login แล้ว)
+          setAuthGate({ loading: true, title: 'กำลังนำท่านไปเข้าสู่ระบบ LINE...', text: 'กรุณารอสักครู่' });
+          liff.login();
+          return;
+        }
+
+        liffIdToken = liff.getIDToken();
+        if (!liffIdToken) {
+          // เกิดกรณีนี้ได้ถ้ายังไม่ได้เปิด scope "openid" ไว้ในหน้า LIFF app settings
+          setAuthGate({
+            title: 'ไม่พบสิทธิ์การเข้าใช้งาน',
+            text: 'ไม่สามารถยืนยันตัวตนผ่านไลน์ได้ กรุณาเปิดหน้านี้ผ่านลิงก์ในแอป LINE อีกครั้ง',
+            showRetry: true,
+            danger: true
+          });
+          return;
+        }
+
+        try {
           liffProfile = await liff.getProfile();
           showUserProfile(liffProfile);
+        } catch (profileErr) {
+          console.error('getProfile error', profileErr);
         }
-      } catch (profileErr) {
-        console.error('getProfile error', profileErr);
+
+        authReady = true;
+        hideAuthGate();
+      } catch (err) {
+        console.error('LIFF init error', err);
+        setAuthGate({
+          title: 'เกิดข้อผิดพลาด',
+          text: 'ไม่สามารถยืนยันตัวตนผ่านไลน์ได้ กรุณาเปิดหน้านี้ผ่านลิงก์ในแอป LINE อีกครั้ง',
+          showRetry: true,
+          danger: true
+        });
       }
-    }).catch(function (err) {
-      console.error('LIFF init error', err);
-    });
+    }
+    initAuth();
 
     // แสดงรูป + ชื่อโปรไฟล์ LINE บน header (badge ข้างปุ่ม info)
     function showUserProfile(profile) {
@@ -593,6 +721,17 @@
       const name = document.getElementById('name').value.trim();
       const file = fileInput.files[0];
 
+      // [ใหม่] กันไว้อีกชั้นฝั่งหน้าเว็บ: ถ้ายังไม่ได้ login/ไม่มี idToken ห้ามส่ง
+      // (การกันที่แท้จริงคือฝั่ง backend ที่ verify idToken กับ LINE server อีกที)
+      if (!authReady || !liffIdToken) {
+        fireAlert({
+          type: 'warning',
+          title: 'กรุณาเข้าสู่ระบบก่อน',
+          text: 'ยังไม่ได้ยืนยันตัวตนผ่านไลน์ กรุณาเปิดหน้านี้ผ่านลิงก์ในแอป LINE แล้วลองใหม่'
+        });
+        return;
+      }
+
       if (!name) {
         fireAlert({
           type: 'warning',
@@ -655,7 +794,7 @@
             name: name,
             image: base64,
             mimeType: file.type,
-            userId: liffProfile ? liffProfile.userId : null
+            idToken: liffIdToken // backend จะ verify กับ LINE server เอง ไม่เชื่อ userId ที่ส่งตรงๆ อีกต่อไป
           })
         });
 

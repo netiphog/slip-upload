@@ -535,6 +535,50 @@
       try { liff.login(); } catch (e) { location.reload(); }
     });
 
+    // [ใหม่] บังคับ login ใหม่แบบอัตโนมัติ เมื่อ session/token ที่ LIFF เก็บไว้ใน
+    // เบราว์เซอร์ (localStorage) หมดอายุหรือใช้ไม่ได้แล้ว แทนที่จะให้ผู้ใช้ต้อง
+    // ไปเคลียร์ cache เอง — liff.logout() จะล้าง token เก่าที่ค้างอยู่ให้ในตัว
+    // แล้วค่อย liff.login() เพื่อพาไปยืนยันตัวตนกับ LINE รอบใหม่
+    //
+    // ใส่ตัวกันลูปไม่รู้จบไว้ด้วย (sessionStorage flag) เผื่อกรณีที่ login ใหม่แล้ว
+    // ก็ยังหลุดอีกทันที (เช่น scope/channel ตั้งค่าผิด) จะได้ไม่ redirect วนไม่หยุด
+    // ผู้ใช้จะได้เห็นข้อความแจ้งเตือนแทน
+    function forceReLogin(reason) {
+      console.warn('Forcing LINE re-login, reason:', reason);
+      try { if (window.Swal) Swal.close(); } catch (e) { /* ไม่มีป๊อปอัพเปิดอยู่ก็ไม่เป็นไร */ }
+      const loopGuardKey = 'liff_relogin_attempted';
+      if (sessionStorage.getItem(loopGuardKey)) {
+        // เพิ่งลอง re-login ไปแล้วในรอบนี้แต่ยังหลุดอีก ไม่ใช่ปัญหา token
+        // หมดอายุธรรมดาแล้ว ให้หยุดวนแล้วโชว์ข้อความแจ้งผู้ใช้แทน
+        sessionStorage.removeItem(loopGuardKey);
+        setAuthGate({
+          title: 'เข้าสู่ระบบไม่สำเร็จ',
+          text: 'กรุณาเปิดหน้านี้ผ่านลิงก์ในแอป LINE อีกครั้ง หรือติดต่อเจ้าหน้าที่หากยังไม่ได้',
+          showRetry: true,
+          danger: true
+        });
+        return;
+      }
+      sessionStorage.setItem(loopGuardKey, '1');
+      // เผื่อถูกเรียกหลัง hideAuthGate() ไปแล้ว (เช่น หลุด token ตอนกำลังส่งสลิป
+      // ไม่ใช่ตอนโหลดหน้าแรก) ต้องเอาม่านกลับมาโชว์ + เบลอพื้นหลังใหม่ด้วย
+      authGate.style.display = 'flex';
+      document.querySelector('header').classList.add('blurred');
+      document.querySelector('main').classList.add('blurred');
+      authReady = false;
+      setAuthGate({ loading: true, title: 'เซสชันหมดอายุ กำลังเข้าสู่ระบบใหม่...', text: 'กรุณารอสักครู่' });
+      try {
+        if (liff.isLoggedIn()) liff.logout();
+      } catch (e) {
+        // ปล่อยผ่านถ้า logout พัง ยังไงก็จะเรียก login ต่อด้านล่างอยู่ดี
+      }
+      try {
+        liff.login();
+      } catch (e) {
+        location.reload();
+      }
+    }
+
     async function initAuth() {
       setAuthGate({ loading: true, title: 'กำลังตรวจสอบสิทธิ์...', text: 'กรุณารอสักครู่' });
       try {
@@ -564,9 +608,20 @@
           liffProfile = await liff.getProfile();
           showUserProfile(liffProfile);
         } catch (profileErr) {
+          // [ใหม่] เคสนี้คือจุดที่ทำให้ user ค้าง: liff.isLoggedIn() อ่านจาก
+          // localStorage แล้วตอบ true (session เก่ายังไม่ถูกลบ) แต่ token จริง
+          // ใช้ไม่ได้แล้ว (หมดอายุ/ถูกเพิกถอน) เรียก getProfile() เลย fail
+          // เดิมโค้ดจะแค่ log แล้วปล่อยให้ authReady = true ต่อ ทำให้ผู้ใช้ส่ง
+          // สลิปด้วย token เสียไปเรื่อยๆ ตอนนี้เปลี่ยนเป็นบังคับ re-login ทันที
           console.error('getProfile error', profileErr);
+          forceReLogin('getProfile failed, likely stale/expired session in localStorage');
+          return;
         }
 
+        // login สำเร็จและ token ใช้งานได้จริง ล้าง flag กันลูปไว้ เผื่อ session
+        // นี้หลุดอีกในอนาคตจะได้ลอง re-login อัตโนมัติได้อีกครั้ง (ไม่ใช่ถูกบล็อก
+        // จากความพยายามครั้งก่อนที่ไม่เกี่ยวข้องกันแล้ว)
+        sessionStorage.removeItem('liff_relogin_attempted');
         authReady = true;
         hideAuthGate();
       } catch (err) {
@@ -787,6 +842,12 @@
       try {
         const base64 = await toBase64(file);
 
+        // [ใหม่] ดึง idToken สดใหม่ตอนกดส่งจริง แทนที่จะใช้ตัวแปรที่จับไว้ตอน
+        // โหลดหน้าครั้งแรก เผื่อผู้ใช้เปิดหน้าค้างไว้นานแล้วค่อยกดส่ง จะได้ไม่ยิง
+        // token เก่าไปให้ backend เช็คโดยไม่จำเป็น (liff.getIDToken() คืนค่า
+        // token ล่าสุดที่ SDK มีอยู่ตอนนั้นให้เสมอ)
+        const freshIdToken = liff.getIDToken() || liffIdToken;
+
         // หมายเหตุ: ไม่ตั้ง Content-Type header เอง เพื่อเลี่ยงปัญหา CORS preflight กับ Apps Script
         const res = await fetch(GAS_URL, {
           method: 'POST',
@@ -794,7 +855,7 @@
             name: name,
             image: base64,
             mimeType: file.type,
-            idToken: liffIdToken // backend จะ verify กับ LINE server เอง ไม่เชื่อ userId ที่ส่งตรงๆ อีกต่อไป
+            idToken: freshIdToken // backend จะ verify กับ LINE server เอง ไม่เชื่อ userId ที่ส่งตรงๆ อีกต่อไป
           })
         });
 
@@ -819,6 +880,24 @@
             }
           }
         } else {
+          // [ใหม่] เช็คว่า error ที่ backend ตอบมาเป็นเรื่องยืนยันตัวตน/token
+          // หมดอายุหรือเปล่า (ข้อความมาจาก verifyLineIdToken ใน checkslip.gs
+          // เช่น "ยืนยันตัวตนผ่านไลน์ไม่สำเร็จ: ...expired..." หรือ
+          // "ไม่พบข้อมูลยืนยันตัวตนจากไลน์") ถ้าใช่ ให้บังคับ re-login ให้เลย
+          // แทนที่จะปล่อยให้ผู้ใช้กดส่งซ้ำแล้วเจอ error เดิมวนไป
+          const msg = (result.message || '').toString();
+          const isAuthError = /ยืนยันตัวตน|idToken|id token|expired|invalid_request|token/i.test(msg);
+          if (isAuthError) {
+            submitBtn.disabled = false;
+            await fireAlert({
+              type: 'warning',
+              title: 'เซสชันหมดอายุ',
+              text: 'กรุณาเข้าสู่ระบบ LINE ใหม่อีกครั้งแล้วลองส่งสลิปใหม่'
+            });
+            authReady = false;
+            forceReLogin('backend rejected idToken: ' + msg);
+            return;
+          }
           fireAlert({
             type: 'error',
             title: 'ส่งสลิปไม่สำเร็จ',

@@ -324,6 +324,41 @@
       color: #fff !important;
       border: none !important;
     }
+    /* ป๊อปอัพเลือก ถ่ายภาพ / เลือกจากคลังภาพ */
+    .upload-choice-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px;
+      text-align: left;
+    }
+    .upload-choice-btn {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 15px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s, border-color 0.15s;
+    }
+    .upload-choice-btn:active { transform: scale(0.98); background: var(--primary-soft); border-color: var(--primary); }
+    .upload-choice-icon {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--primary-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .upload-choice-label {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text);
+    }
     .native-btn-single {
       width: 100%;
       background: var(--primary) !important;
@@ -479,16 +514,16 @@
         <label for="name">ชื่อผู้แจ้ง หรือโอนแทนใคร</label>
         <input type="text" id="name" placeholder="ชื่อ-นามสกุลผู้โอน หรือคนที่โอนแทน" required>
 
-        <label for="slipImage">แนบรูปสลิป</label>
+        <label>แนบรูปสลิป</label>
         <div class="upload-box" id="uploadBox">
-          <label for="slipImage" style="margin:0; cursor:pointer;">
-            <div class="upload-hint" id="uploadHint">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" stroke-width="1.6"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-              แตะเพื่อเลือกหรือถ่ายรูปสลิป
-            </div>
-            <img id="preview" alt="ตัวอย่างรูปสลิป">
-          </label>
-          <input type="file" id="slipImage" accept="image/*" required>
+          <div class="upload-hint" id="uploadHint">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" stroke-width="1.6"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+            แตะเพื่อเลือกหรือถ่ายรูปสลิป
+          </div>
+          <img id="preview" alt="ตัวอย่างรูปสลิป">
+          <!-- ซ่อนไว้ ไม่ให้ผู้ใช้กดตรงๆ: จะถูกสั่งเปิดจากป๊อปอัพเลือกอีกที -->
+          <input type="file" id="slipImageCamera" accept="image/*" capture="environment" style="display:none;">
+          <input type="file" id="slipImageGallery" accept="image/*" style="display:none;">
         </div>
 
         <button type="submit" id="submitBtn">ส่งสลิป</button>
@@ -755,26 +790,83 @@
       });
     });
 
-    const fileInput = document.getElementById('slipImage');
+    const cameraInput = document.getElementById('slipImageCamera');
+    const galleryInput = document.getElementById('slipImageGallery');
     const preview = document.getElementById('preview');
     const uploadHint = document.getElementById('uploadHint');
     const uploadBox = document.getElementById('uploadBox');
 
-    fileInput.addEventListener('change', function () {
-      const file = fileInput.files[0];
-      if (file) {
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-        uploadHint.style.display = 'none';
-        uploadBox.classList.add('has-image');
-      }
+    // เก็บไฟล์ที่ผู้ใช้เลือกไว้ที่ตัวแปรนี้ตัวเดียว ไม่ว่าจะมาจากอินพุตกล้องหรือคลังภาพ
+    let selectedFile = null;
+
+    function handleFileSelected(file) {
+      if (!file) return;
+      selectedFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+      uploadHint.style.display = 'none';
+      uploadBox.classList.add('has-image');
+    }
+
+    cameraInput.addEventListener('change', function () {
+      handleFileSelected(cameraInput.files[0]);
+    });
+    galleryInput.addEventListener('change', function () {
+      handleFileSelected(galleryInput.files[0]);
+    });
+
+    // ----- ป๊อปอัพเลือก: ถ่ายภาพ หรือ เลือกจากคลังภาพ -----
+    // ทำแบบนี้แทนการพึ่ง capture="environment" อย่างเดียว เพราะพฤติกรรม
+    // ของ browser ในแต่ละแพลตฟอร์ม/เครื่องไม่เหมือนกัน (บางเครื่อง Android
+    // ถ้าไม่มี capture จะข้ามกล้องไปเปิดคลังภาพอย่างเดียวเลย) การถามผู้ใช้เอง
+    // ด้วยป๊อปอัพนี้ทำให้ได้พฤติกรรมเดียวกันทุกเครื่อง
+    uploadBox.addEventListener('click', function () {
+      Swal.fire({
+        html: `
+          <div class="native-alert-title" style="margin-bottom:2px;">แนบรูปสลิป</div>
+          <div class="native-alert-text">เลือกวิธีแนบรูปสลิปโอนเงิน</div>
+          <div class="upload-choice-list">
+            <div class="upload-choice-btn" id="choiceCameraBtn">
+              <div class="upload-choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="var(--primary)" stroke-width="1.6" fill="none"/><circle cx="12" cy="12.5" r="3" stroke="var(--primary)" stroke-width="1.6" fill="none"/><path d="M8.5 6l1-2h5l1 2" stroke="var(--primary)" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="upload-choice-label">ถ่ายภาพ</div>
+            </div>
+            <div class="upload-choice-btn" id="choiceGalleryBtn">
+              <div class="upload-choice-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" stroke="var(--primary)" stroke-width="1.6" fill="none"/><circle cx="8.5" cy="9.5" r="1.6" stroke="var(--primary)" stroke-width="1.6" fill="none"/><path d="M4 16.5l5-5 4 4 3-3 4 4" stroke="var(--primary)" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="upload-choice-label">เลือกจากคลังภาพ</div>
+            </div>
+          </div>
+        `,
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        buttonsStyling: false,
+        customClass: {
+          popup: 'native-alert',
+          actions: 'native-alert-actions',
+          cancelButton: 'native-btn native-btn-cancel'
+        },
+        didOpen: function () {
+          document.getElementById('choiceCameraBtn').addEventListener('click', function () {
+            Swal.close();
+            cameraInput.click();
+          });
+          document.getElementById('choiceGalleryBtn').addEventListener('click', function () {
+            Swal.close();
+            galleryInput.click();
+          });
+        }
+      });
     });
 
     document.getElementById('slipForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       const submitBtn = document.getElementById('submitBtn');
       const name = document.getElementById('name').value.trim();
-      const file = fileInput.files[0];
+      const file = selectedFile;
 
       // [ใหม่] กันไว้อีกชั้นฝั่งหน้าเว็บ: ถ้ายังไม่ได้ login/ไม่มี idToken ห้ามส่ง
       // (การกันที่แท้จริงคือฝั่ง backend ที่ verify idToken กับ LINE server อีกที)
@@ -873,6 +965,7 @@
               liff.closeWindow();
             } else {
               document.getElementById('slipForm').reset();
+              selectedFile = null;
               preview.style.display = 'none';
               uploadHint.style.display = 'block';
               uploadBox.classList.remove('has-image');
